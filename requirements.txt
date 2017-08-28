@@ -1,0 +1,7 @@
+numpy
+matplotlib
+pymongo
+gensim
+sklearn
+networkx
+pygraphviz

@@ -1,0 +1,45 @@
+# Compiled python modules.
+__pycache__/
+*.pyc
+
+# Setuptools distribution folder.
+/dist/
+
+# Python egg metadata, regenerated from source files by setuptools.
+/*.egg-info
+.eggs/
+
+# Log Files
+*.log
+
+# Images/Figures
+*.png
+*.pdf
+*.html
+
+# Nohup output files
+*nohup.out
+
+# Etc.
+*.svmlight
+*.index
+precomputed_pops*
+test_output
+figures
+output
+.DS_STORE
+
+# Virtualenv
+.Python
+[Bb]in
+[Ii]nclude
+[Ll]ib
+[Ll]ib64
+[Ll]ocal
+[Ss]cripts
+pyvenv.cfg
+.venv
+pip-selfcheck.json
+
+# gtags for text editors
+tags
