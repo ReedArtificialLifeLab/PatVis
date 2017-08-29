@@ -39,8 +39,8 @@ class TraitVisual(object):
         """
         raise("TraitVisual is abstract")
 
-from alife.visualize import get_class_to_cat_dict,get_class_to_subcat_dict,get_category_descriptions_dict,get_subcategory_descriptions_dict, get_class_descriptions, get_cluster_descriptions
-from alife.visualize.discrete_color import discrete_color_scheme
+from patvis import get_class_to_cat_dict,get_class_to_subcat_dict,get_category_descriptions_dict,get_subcategory_descriptions_dict, get_class_descriptions, get_cluster_descriptions
+from patvis.discrete_color import discrete_color_scheme
 
 _class_to_cat = get_class_to_cat_dict()
 _class_to_subcat = get_class_to_subcat_dict()

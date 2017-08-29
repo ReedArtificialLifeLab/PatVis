@@ -1,6 +1,6 @@
 import os
-from alife.visualize.patent_grapher import PatentGrapher
-from alife.visualize import get_family_and_friends
+from patvis.patent_grapher import PatentGrapher
+from patvis import get_family_and_friends
 
 faf = get_family_and_friends()
 

@@ -10,8 +10,8 @@ from pymongo import MongoClient
 from collections import defaultdict
 from getpass import getpass
 import matplotlib.pyplot as plt
-from alife.visualize import get_family_and_friends
-import alife.visualize.patent_grapher_traits as pg_traits
+from patvis import get_family_and_friends
+import patvis.patent_grapher_traits as pg_traits
 #from sklearn.decomposition import PCA
 # import tty, termios
 # import sys
@@ -113,7 +113,7 @@ class PatentGrapher(object):
 
         # build graph from bfs through database
         # if draw_each_gen is on, this will call draw_graph or draw_dot on each iteration
-        aborted, G, colors, color_scheme = self.build_graph(ngenerations, originalpno, threshold)
+        aborted, G, color_scheme = self.build_graph(ngenerations, originalpno, ofile, threshold)
 
         # If user typed 'q' to abort then don't bother trying to draw G
         # if aborted:
@@ -124,16 +124,15 @@ class PatentGrapher(object):
 
         # dot is special insofar as we need to impose levels on the graph according to years
         if self.layout_prog == 'dot':
-            self.draw_dot(G, colors, color_scheme, ofile, ngenerations, threshold)
+            self.draw_dot(G, color_scheme, ofile, ngenerations, threshold)
         else:
-            self.draw_graph(G, colors, color_scheme, ofile, ngenerations, threshold)
+            self.draw_graph(G, color_scheme, ofile, ngenerations, threshold)
 
-    def build_graph(self, ngenerations, originalpno, threshold):
+    def build_graph(self, ngenerations, originalpno, ofile, threshold):
 
         # init graph, color scheme and db query templates
         db = self.db
         G = nx.DiGraph()
-        colors = defaultdict(int) # dict holding counts for each color
         color_scheme = None # dict mapping trait values to colors
 
         # # set async keypress listener 
@@ -236,10 +235,13 @@ class PatentGrapher(object):
             print("Nodes in Graph: {}".format(G.size()))
 
             if self.draw_each_gen:
-                color_scheme = self.draw_graph()
-        return False, G, colors, color_scheme
+                if self.layout_prog == 'dot':
+                    color_scheme = self.draw_dot(G, color_scheme, ofile, generation, threshold)
+                else:
+                    color_scheme = self.draw_graph(G, color_scheme, ofile, generation, threshold)
+        return False, G, color_scheme
 
-    def draw_graph(self, G, colors, color_scheme, ofile, generation, threshold):
+    def draw_graph(self, G, color_scheme, ofile, generation, threshold):
         """Writes graph to file with some aesthetics and graph descriptions"""
 
         print("Coloring...")
@@ -250,14 +252,20 @@ class PatentGrapher(object):
         print("Laying out graph and drawing...")
         plt.figure(figsize=self.size)
         pos = self.position_nodes(G)
-        node_colors = [ color_scheme[G.node[nodeid][self.trait.trait_type]] if G.node[nodeid][self.trait.trait_type] != None else "#000000" for nodeid in G.nodes() ]
-        edge_colors = [ color_scheme[G.node[p][self.trait.trait_type]] if G.node[p][self.trait.trait_type] != None else "#000000" for p,d in G.edges() ]
+
+        # the graph is colored according to dot format, we have to convert to input to matplotlib
+        node_colors = [ attr['fillcolor'] for _,attr in G.nodes_iter(data=True) ]
+        edge_colors = [ attr['color'] for _,_,attr in G.edges_iter(data=True) ]
+        # node_colors = [ color_scheme[G.node[nodeid][self.trait.trait_type]] if G.node[nodeid][self.trait.trait_type] != None else "#000000" for nodeid in G.nodes() ]
+        # edge_colors = [ color_scheme[G.node[p][self.trait.trait_type]] if G.node[p][self.trait.trait_type] != None else "#000000" for p,d in G.edges() ]
+        
         nx.draw(G,
                 pos=pos,
                 node_color=node_colors,
                 edge_color=edge_colors, 
                 node_size=50,
                 arrows=False)
+        
         filename, file_extension = os.path.splitext(ofile)
         dir = str(self.outfile_path) + str('/') + str(filename)
         if not os.path.exists(dir):
@@ -267,7 +275,7 @@ class PatentGrapher(object):
         nx.nx_agraph.write_dot(G, fn + '.dot')
         return color_scheme
 
-    def draw_dot(self, G, colors, color_scheme, ofile, generation, threshold):
+    def draw_dot(self, G, color_scheme, ofile, generation, threshold):
         """Writes dot graph to file with some aesthetics and graph descriptions"""
         
         print("Coloring...")
@@ -307,8 +315,10 @@ class PatentGrapher(object):
         return color_scheme
 
     def color_graph(self, G, color_scheme):
-        """colors the graph 'G' with specified color scheme"""
-
+        """
+        colors the graph 'G' with specified color scheme
+        """
+        
         for node in G.nodes_iter():
             maintrait = G.node[ node ][self.trait.trait_type]
             if maintrait in color_scheme:
@@ -319,6 +329,15 @@ class PatentGrapher(object):
                 else:
                     for o,i in G.in_edges_iter([node]):
                         G.edge[o][i]['color'] = color_scheme[maintrait]
+            else:
+                G.node[ node ]['fillcolor'] = '#000000'
+                if self.color_edges_by_parent:
+                    for o,i in G.out_edges_iter([node]):
+                        G.edge[o][i]['color'] = '#000000'
+                else:
+                    for o,i in G.in_edges_iter([node]):
+                        G.edge[o][i]['color'] = '#000000'
+                
         return G
 
     def convert_to_agraph(self, G):

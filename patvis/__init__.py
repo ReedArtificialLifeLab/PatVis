@@ -1,6 +1,6 @@
 import csv, os
 
-_data_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'data')
+_data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
 
 def get_family_and_friends():
     # get family and friends

@@ -10,11 +10,11 @@ from sklearn.externals import joblib
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from gensim import models,corpora
-from alife.visualize.discrete_color import discrete_color_scheme
+from patvis.discrete_color import discrete_color_scheme
 from collections import defaultdict
 import csv
 from itertools import islice
-from alife.visualize.util import cosine_dist
+from patvis.util import cosine_dist
 import time
 from pymongo import MongoClient
 from getpass import getpass
