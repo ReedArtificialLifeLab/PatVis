@@ -123,10 +123,10 @@ class PatentGrapher(object):
             G, threshold = self.prune_graph(G, originalpno, threshold)
 
         # dot is special insofar as we need to impose levels on the graph according to years
-        if self.layout_prog == 'dot':
-            self.draw_dot(G, color_scheme, ofile, ngenerations, threshold)
-        else:
-            self.draw_graph(G, color_scheme, ofile, ngenerations, threshold)
+        # if self.layout_prog == 'dot':
+        # self.draw_dot(G, color_scheme, ofile, ngenerations, threshold, originalpno)
+        # else:
+        self.draw_graph(G, color_scheme, ofile, ngenerations, threshold, originalpno)
 
     def build_graph(self, ngenerations, originalpno, ofile, threshold):
 
@@ -148,8 +148,8 @@ class PatentGrapher(object):
             print("Original Patent No. {} missing Necessary Fields".format(originalpno))
             return
 
-        next_gen_ancestors = { originalpno : patn[self.trait.cited] }
-        next_gen_descendants = { originalpno : patn[self.trait.citedby] }
+        next_gen_ancestors = { originalpno : map(int, patn[self.trait.cited]) }
+        next_gen_descendants = { originalpno : map(int, patn[self.trait.citedby]) }
 
         G.add_node( originalpno, self.get_node_attributes(patn, {'shape' : 'star', 'width' : self.node_width, 'height' : self.node_height, 'ncites' : len(patn[self.trait.citedby]) }) )
 
@@ -185,7 +185,7 @@ class PatentGrapher(object):
                                     
                                 G.add_edge(ancpno, descpno, penwidth=self.edge_width, arrowhead="none")
                                                                 
-                                next_gen_ancestors[ancpno] = anc[self.trait.cited]
+                                next_gen_ancestors[ancpno] = map(int, anc[self.trait.cited])
                                                                 
                             else:
                                 undersizedpatns += 1
@@ -216,7 +216,7 @@ class PatentGrapher(object):
 
                                 G.add_edge(ancpno, descpno, penwidth=self.edge_width, arrowhead="none")
                                 
-                                next_gen_descendants[descpno] = desc[self.trait.citedby]
+                                next_gen_descendants[descpno] = map(int, desc[self.trait.citedby])
                                                                 
                             else:
                                 undersizedpatns += 1
@@ -232,7 +232,10 @@ class PatentGrapher(object):
             print("Patents Missing Fields: {}".format(badpatns))
             print("Ancestors Processed this Generation: {}".format(ancsprocessed))
             print("Descendants Processed this Generation: {}".format(descsprocessed))
-            print("Nodes in Graph: {}".format(G.size()))
+            print("Nodes in Graph: {}".format(G.order()))
+            for node in G.nodes_iter():
+                if not isinstance(node,(int,float)) or node < originalpno or node > 9226437:
+                    print(node)
 
             if self.draw_each_gen:
                 if self.layout_prog == 'dot':
@@ -241,7 +244,7 @@ class PatentGrapher(object):
                     color_scheme = self.draw_graph(G, color_scheme, ofile, generation, threshold)
         return False, G, color_scheme
 
-    def draw_graph(self, G, color_scheme, ofile, generation, threshold):
+    def draw_graph(self, G, color_scheme, ofile, generation, threshold, originalpno):
         """Writes graph to file with some aesthetics and graph descriptions"""
 
         print("Coloring...")
@@ -256,17 +259,27 @@ class PatentGrapher(object):
         # the graph is colored according to dot format, we have to convert to input to matplotlib
         node_colors = [ attr['fillcolor'] for _,attr in G.nodes_iter(data=True) ]
         edge_colors = [ attr['color'] for _,_,attr in G.edges_iter(data=True) ]
-        # node_colors = [ color_scheme[G.node[nodeid][self.trait.trait_type]] if G.node[nodeid][self.trait.trait_type] != None else "#000000" for nodeid in G.nodes() ]
-        # edge_colors = [ color_scheme[G.node[p][self.trait.trait_type]] if G.node[p][self.trait.trait_type] != None else "#000000" for p,d in G.edges() ]
+        node_sizes = [ 25 if node != originalpno else 300 for node in G.nodes_iter() ] # 25 is sensible default size for networkx drawing
         
         nx.draw(G,
                 pos=pos,
                 node_color=node_colors,
-                edge_color=edge_colors, 
-                node_size=50,
+                edge_color=edge_colors,
+                node_size=node_sizes,
                 arrows=False)
-        
+
         filename, file_extension = os.path.splitext(ofile)
+        name = filename.split('_')[0]
+        info = "Patent: " + filename + "\nGenerations: " + str(generation)
+        if self.show_parameters:
+            if self.color_edges_by_parent:
+                info += "\nColor Edges By: parent"
+            else:
+                info += "\nColor Edges By: child"
+        info += "\nThreshold: " + str(threshold) + "\nNodes: " + str(G.order())
+        
+        plt.annotate(info, (0,0), (0, -20), xycoords='axes fraction', textcoords='offset points', va='top')
+        
         dir = str(self.outfile_path) + str('/') + str(filename)
         if not os.path.exists(dir):
             os.mkdir(dir)
@@ -275,44 +288,47 @@ class PatentGrapher(object):
         nx.nx_agraph.write_dot(G, fn + '.dot')
         return color_scheme
 
-    def draw_dot(self, G, color_scheme, ofile, generation, threshold):
-        """Writes dot graph to file with some aesthetics and graph descriptions"""
+    # def draw_dot(self, G, color_scheme, ofile, generation, threshold, originalpno):
+    #     """Writes dot graph to file with some aesthetics and graph descriptions"""
         
-        print("Coloring...")
-        color_scheme = self.trait.generate_color_scheme(G, color_scheme)
-        G = self.color_graph(G,color_scheme)
-        #A = nx.nx_agraph.to_agraph(G)
-        print("Ranking by years...")
-        A = self.convert_to_agraph(G)
+    #     print("Coloring...")
+    #     color_scheme = self.trait.generate_color_scheme(G, color_scheme)
+    #     G = self.color_graph(G,color_scheme)
+    #     node_colors = [ attr['fillcolor'] for _,attr in G.nodes_iter(data=True) ]
+    #     edge_colors = [ attr['color'] for _,_,attr in G.edges_iter(data=True) ]
+    #     print("Ranking by years...")
+    #     A = self.convert_to_agraph(G)
 
-        filename, file_extension = os.path.splitext(ofile)
+    #     filename, file_extension = os.path.splitext(ofile)
 
-        name = filename.split('_')[0]
-        info = "Patent: " + filename + "\nGenerations: " + str(generation)
-        if self.show_parameters:
-            if self.color_edges_by_parent:
-                info += "\nColor Edges By: parent"
-            else:
-                info += "\nColor Edges By: child"
-        info += "\nThreshold: " + str(threshold) + "\nNodes: " + str(G.size())
+    #     A.graph_attr.update(size=str(self.size[0]) + ',' + str(self.size[1]),ratio="fill",fontsize=200,label=info,ranksep="equally")
+    #     A.layout(prog=self.layout_prog)
 
-        A.graph_attr.update(size=str(self.size[0]) + ',' + str(self.size[1]),ratio="fill",fontsize=200,label=info,ranksep="equally")
-        A.layout(prog=self.layout_prog)
-        print("Drawing...")
-        A.draw(str(self.outfile_path) +
-               '/' +
-               str(filename) +
-               str(generation) +
-               str(file_extension))
+    #     node_sizes = [ 25 if node != originalpno else 300 for node in G.nodes_iter() ] # 25 is sensible default size for networkx drawing
         
-        print('Graph file path: ' +
-              self.outfile_path +
-              '/' +
-              filename +
-              str(generation) +
-              file_extension +
-              "\n")
-        return color_scheme
+    #     print("Drawing...")
+
+    #     nx.draw(G,
+    #             pos=pos,
+    #             node_color=node_colors,
+    #             edge_color=edge_colors,
+    #             node_size=node_sizes,
+    #             arrows=False)
+
+    #     filename, file_extension = os.path.splitext(ofile)
+    #     dir = str(self.outfile_path) + str('/') + str(filename)
+    #     if not os.path.exists(dir):
+    #         os.mkdir(dir)
+    #     fn = dir + str('/') + str(filename) + str(generation)
+    #     plt.savefig(fn + str(file_extension))
+        
+    #     # A.draw(str(self.outfile_path) +
+    #     #        '/' +
+    #     #        str(filename) +
+    #     #        str(generation) +
+    #     #        str(file_extension))
+        
+    #     return color_scheme
 
     def color_graph(self, G, color_scheme):
         """
@@ -340,7 +356,7 @@ class PatentGrapher(object):
                 
         return G
 
-    def convert_to_agraph(self, G):
+    def position_dot(self, G):
         """
         Converts to pygraphviz format and Induces levels for dot format
         We only use AGraph because networkx graphs do not support induced subgraph levels
@@ -350,28 +366,27 @@ class PatentGrapher(object):
         year_subgraph_arrays = defaultdict(list)
         years = []
         for node,data in G.nodes_iter(data=True):
-            year_subgraph_arrays[ data['year'] ].append(data['year'])
+            #year_subgraph_arrays[ data['year'] ].append(data['year'])
             year_subgraph_arrays[ data['year'] ].append(node)
-            if not G.has_node(data['year']):
-                years.append(data['year'])
+            #if not G.has_node(data['year']):
+            #    years.append(data['year'])
                 
-        for year in range(min(years),max(years)):
-            G.add_node(year, **{ 'fontsize' : 100, 'type' : 'year', 'shape' : 'none', 'year' : year} )
-            G.add_node(year + 1, **{ 'fontsize' : 100, 'type' : 'year', 'shape' : 'none', 'year' : year + 1} )
-            G.add_edge(year,year + 1)
+        # for year in range(min(years),max(years)):
+        #     G.add_node(year, **{ 'fontsize' : 100, 'type' : 'year', 'shape' : 'none', 'year' : year} )
+        #     G.add_node(year + 1, **{ 'fontsize' : 100, 'type' : 'year', 'shape' : 'none', 'year' : year + 1} )
+        #     G.add_edge(year,year + 1)
 
-        print("Converting to Pygraphviz AGraph...")
         A = nx.nx_agraph.to_agraph(G)
-        print("Done converting.")
 
-        print("Adding subgraph")
         # induce subgraphs with rank=same
         # this is what forces patents in the same year to appear on the same level
         for subgraph in year_subgraph_arrays.values():
             A.add_subgraph(subgraph,rank="same")
-        print("done.")
+
+        A.graph_attr.update(size=str(self.size[0]) + ',' + str(self.size[1]),ratio="fill",fontsize=200,ranksep="equally")
+        A.layout(self.layout_prog)
             
-        return A
+        return { int(node) : tuple(map(int, node.attr['pos'].split(','))) for node in A.nodes_iter() }
 
     def get_node_attributes(self, patent, extras={}):
         """node attributes for different trait types"""
@@ -387,18 +402,21 @@ class PatentGrapher(object):
         """
         current_threshold = threshold
         print("Pruning...")
-        while G.size() > self.pruning_target:
+        while G.order() > self.pruning_target:
             current_threshold += 1
+            print(threshold,G.order())
             G.remove_nodes_from( [ node for node,attr in G.nodes_iter(data=True) if (attr['ncites'] < current_threshold and node != originalpno) ] )
             for nodes in nx.connected_components(G.to_undirected()):
                 if originalpno not in nodes:
                     G.remove_nodes_from(nodes)
-        print("Final Size: ", G.size())
-        return G, threshold
+        print("Final Size: ", G.order())
+        return G, current_threshold
 
     def position_nodes(self, G):
-        if self.layout_prog in [ 'dot', 'twopi', 'sfdp', 'fdp', 'neato', 'circo' ]:    
+        if self.layout_prog in [ 'twopi', 'sfdp', 'fdp', 'neato', 'circo' ]:    
             return nx.drawing.nx_agraph.graphviz_layout(G,prog=self.layout_prog)
+        elif self.layout_prog == 'dot':
+            return self.position_dot(G)
         elif self.layout_prog == 'circular':
             return nx.drawing.layout.circular_layout(G)
         elif self.layout_prog == 'random':
