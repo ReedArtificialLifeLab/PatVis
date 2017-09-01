@@ -288,53 +288,11 @@ class PatentGrapher(object):
         nx.nx_agraph.write_dot(G, fn + '.dot')
         return color_scheme
 
-    # def draw_dot(self, G, color_scheme, ofile, generation, threshold, originalpno):
-    #     """Writes dot graph to file with some aesthetics and graph descriptions"""
-        
-    #     print("Coloring...")
-    #     color_scheme = self.trait.generate_color_scheme(G, color_scheme)
-    #     G = self.color_graph(G,color_scheme)
-    #     node_colors = [ attr['fillcolor'] for _,attr in G.nodes_iter(data=True) ]
-    #     edge_colors = [ attr['color'] for _,_,attr in G.edges_iter(data=True) ]
-    #     print("Ranking by years...")
-    #     A = self.convert_to_agraph(G)
-
-    #     filename, file_extension = os.path.splitext(ofile)
-
-    #     A.graph_attr.update(size=str(self.size[0]) + ',' + str(self.size[1]),ratio="fill",fontsize=200,label=info,ranksep="equally")
-    #     A.layout(prog=self.layout_prog)
-
-    #     node_sizes = [ 25 if node != originalpno else 300 for node in G.nodes_iter() ] # 25 is sensible default size for networkx drawing
-        
-    #     print("Drawing...")
-
-    #     nx.draw(G,
-    #             pos=pos,
-    #             node_color=node_colors,
-    #             edge_color=edge_colors,
-    #             node_size=node_sizes,
-    #             arrows=False)
-
-    #     filename, file_extension = os.path.splitext(ofile)
-    #     dir = str(self.outfile_path) + str('/') + str(filename)
-    #     if not os.path.exists(dir):
-    #         os.mkdir(dir)
-    #     fn = dir + str('/') + str(filename) + str(generation)
-    #     plt.savefig(fn + str(file_extension))
-        
-    #     # A.draw(str(self.outfile_path) +
-    #     #        '/' +
-    #     #        str(filename) +
-    #     #        str(generation) +
-    #     #        str(file_extension))
-        
-    #     return color_scheme
-
     def color_graph(self, G, color_scheme):
         """
         colors the graph 'G' with specified color scheme
         """
-        
+        node_colors,edge_colors = [],[]
         for node in G.nodes_iter():
             maintrait = G.node[ node ][self.trait.trait_type]
             if maintrait in color_scheme:
@@ -354,7 +312,7 @@ class PatentGrapher(object):
                     for o,i in G.in_edges_iter([node]):
                         G.edge[o][i]['color'] = '#000000'
                 
-        return G
+        return G, node_colors, edge_colors
 
     def position_dot(self, G):
         """
