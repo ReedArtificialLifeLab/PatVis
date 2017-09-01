@@ -112,7 +112,7 @@ class PatentGrapher(object):
         ofile = self.generate_filename(ofile)
 
         # build graph from bfs through database
-        # if draw_each_gen is on, this will call draw_graph or draw_dot on each iteration
+        # if draw_each_gen is on, this will call draw_graph on each iteration
         aborted, G, color_scheme = self.build_graph(ngenerations, originalpno, ofile, threshold)
 
         # If user typed 'q' to abort then don't bother trying to draw G
@@ -122,10 +122,6 @@ class PatentGrapher(object):
         if self.prune_to_target:
             G, threshold = self.prune_graph(G, originalpno, threshold)
 
-        # dot is special insofar as we need to impose levels on the graph according to years
-        # if self.layout_prog == 'dot':
-        # self.draw_dot(G, color_scheme, ofile, ngenerations, threshold, originalpno)
-        # else:
         self.draw_graph(G, color_scheme, ofile, ngenerations, threshold, originalpno)
 
     def build_graph(self, ngenerations, originalpno, ofile, threshold):
@@ -233,15 +229,10 @@ class PatentGrapher(object):
             print("Ancestors Processed this Generation: {}".format(ancsprocessed))
             print("Descendants Processed this Generation: {}".format(descsprocessed))
             print("Nodes in Graph: {}".format(G.order()))
-            for node in G.nodes_iter():
-                if not isinstance(node,(int,float)) or node < originalpno or node > 9226437:
-                    print(node)
 
             if self.draw_each_gen:
-                if self.layout_prog == 'dot':
-                    color_scheme = self.draw_dot(G, color_scheme, ofile, generation, threshold)
-                else:
-                    color_scheme = self.draw_graph(G, color_scheme, ofile, generation, threshold)
+                color_scheme = self.draw_graph(G, color_scheme, ofile, generation, threshold)
+                
         return False, G, color_scheme
 
     def draw_graph(self, G, color_scheme, ofile, generation, threshold, originalpno):
@@ -260,75 +251,39 @@ class PatentGrapher(object):
         node_colors = [ attr['fillcolor'] for _,attr in G.nodes_iter(data=True) ]
         edge_colors = [ attr['color'] for _,_,attr in G.edges_iter(data=True) ]
         node_sizes = [ 25 if node != originalpno else 300 for node in G.nodes_iter() ] # 25 is sensible default size for networkx drawing
-        
+
+        # split the original filename of the format <name>.<extension>
+        filename, file_extension = os.path.splitext(ofile)
+        name = filename.split('_')[0]
+
+        # parameter for drawing parameters onto pdf output
+        if self.show_parameters:
+            info = "Patent: " + filename + "\nGenerations: " + str(generation)
+            if self.color_edges_by_parent:
+                info += "\nColor Edges By: parent"
+            else:
+                info += "\nColor Edges By: child"
+            info += "\nThreshold: " + str(threshold) + "\nNodes: " + str(G.order())
+            plt.annotate(info, (0,0), (0, -20), xycoords='axes fraction', textcoords='offset points', va='top')
+
         nx.draw(G,
                 pos=pos,
                 node_color=node_colors,
                 edge_color=edge_colors,
                 node_size=node_sizes,
                 arrows=False)
-
-        filename, file_extension = os.path.splitext(ofile)
-        name = filename.split('_')[0]
-        info = "Patent: " + filename + "\nGenerations: " + str(generation)
-        if self.show_parameters:
-            if self.color_edges_by_parent:
-                info += "\nColor Edges By: parent"
-            else:
-                info += "\nColor Edges By: child"
-        info += "\nThreshold: " + str(threshold) + "\nNodes: " + str(G.order())
         
-        plt.annotate(info, (0,0), (0, -20), xycoords='axes fraction', textcoords='offset points', va='top')
-        
+        # create a directory if it doesn't already exist
+        # and place the saved pdf there
         dir = str(self.outfile_path) + str('/') + str(filename)
         if not os.path.exists(dir):
             os.mkdir(dir)
         fn = dir + str('/') + str(filename) + str(generation+1)
         plt.savefig(fn + str(file_extension))
+
+        # write a dot file to save the node and edge info for reuse
         nx.nx_agraph.write_dot(G, fn + '.dot')
         return color_scheme
-
-    # def draw_dot(self, G, color_scheme, ofile, generation, threshold, originalpno):
-    #     """Writes dot graph to file with some aesthetics and graph descriptions"""
-        
-    #     print("Coloring...")
-    #     color_scheme = self.trait.generate_color_scheme(G, color_scheme)
-    #     G = self.color_graph(G,color_scheme)
-    #     node_colors = [ attr['fillcolor'] for _,attr in G.nodes_iter(data=True) ]
-    #     edge_colors = [ attr['color'] for _,_,attr in G.edges_iter(data=True) ]
-    #     print("Ranking by years...")
-    #     A = self.convert_to_agraph(G)
-
-    #     filename, file_extension = os.path.splitext(ofile)
-
-    #     A.graph_attr.update(size=str(self.size[0]) + ',' + str(self.size[1]),ratio="fill",fontsize=200,label=info,ranksep="equally")
-    #     A.layout(prog=self.layout_prog)
-
-    #     node_sizes = [ 25 if node != originalpno else 300 for node in G.nodes_iter() ] # 25 is sensible default size for networkx drawing
-        
-    #     print("Drawing...")
-
-    #     nx.draw(G,
-    #             pos=pos,
-    #             node_color=node_colors,
-    #             edge_color=edge_colors,
-    #             node_size=node_sizes,
-    #             arrows=False)
-
-    #     filename, file_extension = os.path.splitext(ofile)
-    #     dir = str(self.outfile_path) + str('/') + str(filename)
-    #     if not os.path.exists(dir):
-    #         os.mkdir(dir)
-    #     fn = dir + str('/') + str(filename) + str(generation)
-    #     plt.savefig(fn + str(file_extension))
-        
-    #     # A.draw(str(self.outfile_path) +
-    #     #        '/' +
-    #     #        str(filename) +
-    #     #        str(generation) +
-    #     #        str(file_extension))
-        
-    #     return color_scheme
 
     def color_graph(self, G, color_scheme):
         """
@@ -370,11 +325,6 @@ class PatentGrapher(object):
             year_subgraph_arrays[ data['year'] ].append(node)
             #if not G.has_node(data['year']):
             #    years.append(data['year'])
-                
-        # for year in range(min(years),max(years)):
-        #     G.add_node(year, **{ 'fontsize' : 100, 'type' : 'year', 'shape' : 'none', 'year' : year} )
-        #     G.add_node(year + 1, **{ 'fontsize' : 100, 'type' : 'year', 'shape' : 'none', 'year' : year + 1} )
-        #     G.add_edge(year,year + 1)
 
         A = nx.nx_agraph.to_agraph(G)
 
@@ -383,7 +333,7 @@ class PatentGrapher(object):
         for subgraph in year_subgraph_arrays.values():
             A.add_subgraph(subgraph,rank="same")
 
-        A.graph_attr.update(size=str(self.size[0]) + ',' + str(self.size[1]),ratio="fill",fontsize=200,ranksep="equally")
+        A.graph_attr.update(ratio="fill",fontsize=200,ranksep="equally")
         A.layout(self.layout_prog)
             
         return { int(node) : tuple(map(int, node.attr['pos'].split(','))) for node in A.nodes_iter() }
@@ -413,6 +363,8 @@ class PatentGrapher(object):
         return G, current_threshold
 
     def position_nodes(self, G):
+        """calls the appropriate layout function"""
+        
         if self.layout_prog in [ 'twopi', 'sfdp', 'fdp', 'neato', 'circo' ]:    
             return nx.drawing.nx_agraph.graphviz_layout(G,prog=self.layout_prog)
         elif self.layout_prog == 'dot':
@@ -458,12 +410,6 @@ class PatentGrapher(object):
             ofile += "descendants"
         ofile += file_extension
         return ofile
-
-    def add_year_nodes_for_dot_format(self, A):
-        for year in range(self.start_year, self.end_year-1):
-            A.add_node(year, **{ 'fontsize' : 100, 'type' : 'year', 'shape' : 'none', 'year' : year} )
-            A.add_node(year + 1, **{ 'fontsize' : 100, 'type' : 'year', 'shape' : 'none', 'year' : year + 1} )
-            A.add_edge(year,year+1)
 
     # def generate_pca_model(self, wordvecs, ncomponents):
     #     """generate pca model for pca coloring"""
